@@ -1,0 +1,20 @@
+# Core quantum computing dependencies
+qiskit>=1.0,<2.0
+qiskit-aer>=0.13
+qiskit-nature>=0.7
+
+# Classical quantum chemistry
+pyscf>=2.4
+
+# Numerical computing
+numpy>=1.24
+scipy>=1.10
+
+# Visualization
+matplotlib>=3.7
+
+# Development dependencies (optional)
+pytest>=7.0
+pytest-cov>=4.0
+black>=23.0
+ruff>=0.1.0

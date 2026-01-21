@@ -454,7 +454,39 @@ def plot_noise_resilience_heatmap(
         >>> fig = plot_noise_resilience_heatmap()
         >>> fig.savefig("noise_resilience.png", dpi=300)
     """
-    # Implementation to follow
+    from h2_vqe.molecular import compute_h2_integrals
+    from h2_vqe.vqe import run_vqe
+    from h2_vqe.noise import create_noise_model
+
+    apply_style()
+
+    # Compute molecular data once
+    mol_data = compute_h2_integrals(bond_length)
+
+    # Build error matrix: rows = ansatz, cols = noise level
+    n_ansatz = len(ansatz_types)
+    n_noise = len(noise_presets)
+    error_matrix = np.zeros((n_ansatz, n_noise))
+
+    print(f"Computing noise resilience heatmap at r = {bond_length} Å...")
+
+    for i, ansatz in enumerate(ansatz_types):
+        for j, noise_preset in enumerate(noise_presets):
+            # Create noise model
+            noise_model = create_noise_model(noise_preset)
+
+            # Run VQE with this ansatz and noise level
+            result = run_vqe(
+                mol_data,
+                ansatz_type=ansatz,
+                noise_model=noise_model if noise_preset != "ideal" else None,
+            )
+
+            # Store error in mHa
+            error_matrix[i, j] = result.error * 1000
+            print(f"  {ansatz:20s} | {noise_preset:12s}: {error_matrix[i, j]:6.2f} mHa")
+
+    # To be continued
     pass
 
 

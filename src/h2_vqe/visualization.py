@@ -398,11 +398,27 @@ def plot_convergence_landscape(
     ax.plot(param_values[min_idx], energies[min_idx], "ro",
             markersize=10, label=f"Global Min ({energies[min_idx]:.6f} Ha)")
 
+    # Annotate with error at minimum
+    error_mha = (energies[min_idx] - mol_data.fci_energy) * 1000
+    ax.annotate(
+        f"Error: {error_mha:.2f} mHa",
+        xy=(param_values[min_idx], energies[min_idx]),
+        xytext=(10, 20),
+        textcoords="offset points",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+        arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0"),
+    )
+
     ax.set_xlabel(f"Parameter θ₁ (radians)" if n_params == 1 else "First Parameter θ₁ (radians)")
     ax.set_ylabel("Energy (Hartree)")
     ax.set_title(f"VQE Energy Landscape: {ansatz_type} ansatz (H₂ at r = {bond_length} Å)")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
+
+    # Add parameter range annotation
+    ax.text(0.02, 0.98, f"Total parameters: {n_params}",
+            transform=ax.transAxes, verticalalignment="top",
+            bbox=dict(boxstyle="round", facecolor="lightblue", alpha=0.5))
 
     plt.tight_layout()
 

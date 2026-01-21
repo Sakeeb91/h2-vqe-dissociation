@@ -357,7 +357,7 @@ def plot_convergence_landscape(
     vqe = VQEEngine(hamiltonian, ansatz, backend="statevector")
 
     # Get initial parameter values
-    initial_params = get_initial_parameters(ansatz_type, 4)
+    initial_params = get_initial_parameters(ansatz)
 
     # Sample parameter space
     param_values = np.linspace(param_range[0], param_range[1], n_points)

@@ -334,7 +334,32 @@ def plot_convergence_landscape(
         For multi-parameter ansatze, this plots energy vs first parameter
         while keeping other parameters at their initial values.
     """
-    # Implementation to follow
+    from h2_vqe.molecular import compute_h2_integrals
+    from h2_vqe.hamiltonian import build_qubit_hamiltonian
+    from h2_vqe.ansatz import create_ansatz, get_initial_parameters
+    from h2_vqe.vqe import VQEEngine
+
+    apply_style()
+
+    # Compute molecular data
+    mol_data = compute_h2_integrals(bond_length)
+    hamiltonian = build_qubit_hamiltonian(mol_data)
+
+    # Create ansatz
+    ansatz = create_ansatz(ansatz_type, n_qubits=4)
+    n_params = ansatz.num_parameters
+
+    print(f"Plotting convergence landscape for {ansatz_type}")
+    print(f"Bond length: {bond_length} Å")
+    print(f"Number of parameters: {n_params}")
+
+    # Create VQE engine
+    vqe = VQEEngine(hamiltonian, ansatz, backend="statevector")
+
+    # Get initial parameter values
+    initial_params = get_initial_parameters(ansatz_type, 4)
+
+    # To be continued
     pass
 
 

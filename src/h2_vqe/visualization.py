@@ -359,6 +359,26 @@ def plot_convergence_landscape(
     # Get initial parameter values
     initial_params = get_initial_parameters(ansatz_type, 4)
 
+    # Sample parameter space
+    param_values = np.linspace(param_range[0], param_range[1], n_points)
+    energies = []
+
+    print(f"Sampling {n_points} parameter values...")
+
+    for i, p in enumerate(param_values):
+        # Set first parameter, keep rest at initial values
+        test_params = initial_params.copy()
+        test_params[0] = p
+
+        # Compute energy
+        energy = vqe.compute_energy(test_params)
+        energies.append(energy)
+
+        if (i + 1) % 20 == 0:
+            print(f"  {i+1}/{n_points} complete")
+
+    energies = np.array(energies)
+
     # To be continued
     pass
 

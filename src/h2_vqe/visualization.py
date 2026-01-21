@@ -11,6 +11,10 @@ The main output is a 4-panel figure showing:
 3. Correlation energy analysis
 4. Convergence behavior
 
+New advanced visualizations:
+- plot_convergence_landscape: Energy landscape in parameter space
+- plot_noise_resilience_heatmap: Ansatz vs noise level error analysis
+
 Example:
     >>> from h2_vqe.dissociation import compute_dissociation_curve
     >>> from h2_vqe.visualization import create_dissociation_figure

@@ -429,6 +429,35 @@ def plot_convergence_landscape(
     return fig
 
 
+def plot_noise_resilience_heatmap(
+    ansatz_types: List[str] = ["uccsd", "hardware_efficient", "noise_aware"],
+    noise_presets: List[str] = ["ideal", "low_noise", "ibm_like", "high_noise"],
+    bond_length: float = 0.74,
+    save_path: Optional[str] = None,
+) -> Figure:
+    """
+    Create a heatmap showing VQE error across ansatz types and noise levels.
+
+    This visualization answers: "Which ansatz survives which noise regime?"
+    and is directly relevant to quantum hardware benchmarking.
+
+    Args:
+        ansatz_types: List of ansatz types to compare
+        noise_presets: List of noise preset names
+        bond_length: H₂ bond length to compute at (default: equilibrium)
+        save_path: Optional path to save figure
+
+    Returns:
+        matplotlib Figure with heatmap
+
+    Example:
+        >>> fig = plot_noise_resilience_heatmap()
+        >>> fig.savefig("noise_resilience.png", dpi=300)
+    """
+    # Implementation to follow
+    pass
+
+
 if __name__ == "__main__":
     # Demo with sample data
     print("Creating sample visualization...")

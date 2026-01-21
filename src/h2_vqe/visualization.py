@@ -379,8 +379,38 @@ def plot_convergence_landscape(
 
     energies = np.array(energies)
 
-    # To be continued
-    pass
+    # Create plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plot energy landscape
+    ax.plot(param_values, energies, "b-", linewidth=2, label="VQE Energy")
+
+    # Add FCI reference line
+    ax.axhline(mol_data.fci_energy, color=COLORS["fci"], linestyle="--",
+               linewidth=2, label=f"FCI Energy ({mol_data.fci_energy:.6f} Ha)")
+
+    # Add HF reference line
+    ax.axhline(mol_data.hf_energy, color=COLORS["hf"], linestyle=":",
+               linewidth=2, label=f"HF Energy ({mol_data.hf_energy:.6f} Ha)")
+
+    # Mark global minimum
+    min_idx = np.argmin(energies)
+    ax.plot(param_values[min_idx], energies[min_idx], "ro",
+            markersize=10, label=f"Global Min ({energies[min_idx]:.6f} Ha)")
+
+    ax.set_xlabel(f"Parameter θ₁ (radians)" if n_params == 1 else "First Parameter θ₁ (radians)")
+    ax.set_ylabel("Energy (Hartree)")
+    ax.set_title(f"VQE Energy Landscape: {ansatz_type} ansatz (H₂ at r = {bond_length} Å)")
+    ax.legend(loc="upper right")
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if save_path:
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"\nLandscape saved to: {save_path}")
+
+    return fig
 
 
 if __name__ == "__main__":

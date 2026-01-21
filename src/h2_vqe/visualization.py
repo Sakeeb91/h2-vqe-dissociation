@@ -486,8 +486,38 @@ def plot_noise_resilience_heatmap(
             error_matrix[i, j] = result.error * 1000
             print(f"  {ansatz:20s} | {noise_preset:12s}: {error_matrix[i, j]:6.2f} mHa")
 
-    # To be continued
-    pass
+    # Create heatmap
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    im = ax.imshow(error_matrix, cmap="RdYlGn_r", aspect="auto")
+
+    # Set ticks and labels
+    ax.set_xticks(np.arange(n_noise))
+    ax.set_yticks(np.arange(n_ansatz))
+    ax.set_xticklabels([preset.replace("_", "\n") for preset in noise_presets])
+    ax.set_yticklabels(ansatz_types)
+
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.set_label("VQE Error (mHa)", rotation=270, labelpad=20)
+
+    # Add text annotations
+    for i in range(n_ansatz):
+        for j in range(n_noise):
+            text = ax.text(j, i, f"{error_matrix[i, j]:.1f}",
+                          ha="center", va="center", color="black", fontsize=10)
+
+    ax.set_xlabel("Noise Level")
+    ax.set_ylabel("Ansatz Type")
+    ax.set_title(f"Noise Resilience Heatmap (H₂ at r = {bond_length} Å)")
+
+    plt.tight_layout()
+
+    if save_path:
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"\nHeatmap saved to: {save_path}")
+
+    return fig
 
 
 if __name__ == "__main__":

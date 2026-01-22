@@ -79,9 +79,13 @@ venv.bak/
 # macOS
 .DS_Store
 
-# Project specific
+# Project specific - experiment outputs
 results/*.json
 results/*.png
 results/*.pdf
+results/*.csv
 !results/.gitkeep
 *.log
+
+# Temporary test files
+test_viz*.py

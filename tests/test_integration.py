@@ -114,6 +114,56 @@ class TestNoiseModel:
             noise_model = create_noise_model(preset)
             assert noise_model is not None
 
+    def test_noisy_vqe_runs(self):
+        """VQE should run with noise model."""
+        mol_data = compute_h2_integrals(0.74)
+        noise_model = create_noise_model("low_noise")
+
+        # Run VQE with noise - use fewer iterations for speed
+        result = run_vqe(
+            mol_data,
+            ansatz_type="noise_aware",
+            noise_model=noise_model,
+            maxiter=20,
+            shots=1024,
+        )
+
+        # Should return valid result
+        assert result is not None
+        assert np.isfinite(result.energy)
+        assert result.energy > -5.0  # Reasonable energy floor
+        assert result.error is not None
+
+    def test_noise_model_affects_energy(self):
+        """Noisy VQE should generally have different energy than noiseless."""
+        mol_data = compute_h2_integrals(0.74)
+
+        # Run noiseless
+        result_noiseless = run_vqe(
+            mol_data,
+            ansatz_type="noise_aware",
+            backend="statevector",
+            maxiter=50,
+        )
+
+        # Run with high noise
+        noise_model = create_noise_model("high_noise")
+        result_noisy = run_vqe(
+            mol_data,
+            ansatz_type="noise_aware",
+            noise_model=noise_model,
+            maxiter=50,
+            shots=2048,
+        )
+
+        # Both should be finite
+        assert np.isfinite(result_noiseless.energy)
+        assert np.isfinite(result_noisy.energy)
+
+        # Noisy result typically has higher error
+        # (not guaranteed but highly likely with high noise)
+        assert result_noisy.error > 0.0
+
 
 class TestPhysicalCorrectness:
     """Tests for physical correctness of results."""

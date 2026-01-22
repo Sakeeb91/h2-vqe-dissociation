@@ -637,6 +637,178 @@ def plot_noise_resilience_heatmap(
     return fig
 
 
+def plot_zne_comparison(
+    bond_lengths: np.ndarray,
+    fci_energies: np.ndarray,
+    sim_noiseless: np.ndarray,
+    sim_noisy: np.ndarray,
+    hw_raw: Optional[np.ndarray] = None,
+    hw_zne: Optional[np.ndarray] = None,
+    save_path: Optional[str] = None,
+) -> Figure:
+    """
+    Create publication-quality comparison plot showing ZNE effectiveness.
+
+    This visualization answers the research question: "How effective is
+    Zero-Noise Extrapolation for VQE on real IBM Quantum hardware?"
+
+    Three panels:
+        (a) Energy vs bond length for all conditions
+        (b) Error vs bond length (|E - E_FCI|)
+        (c) ZNE improvement factor at each bond length
+
+    Args:
+        bond_lengths: Array of bond distances in Angstroms
+        fci_energies: Array of exact FCI energies
+        sim_noiseless: Array of noiseless VQE energies
+        sim_noisy: Array of noisy VQE energies (IBM-like noise)
+        hw_raw: Optional array of hardware energies (resilience_level=0)
+        hw_zne: Optional array of hardware energies (resilience_level=2)
+        save_path: Optional path to save figure
+
+    Returns:
+        matplotlib Figure
+
+    Example:
+        >>> fig = plot_zne_comparison(
+        ...     bond_lengths=np.array([0.5, 0.74, 1.0, 1.5, 2.0]),
+        ...     fci_energies=fci,
+        ...     sim_noiseless=sim_noiseless,
+        ...     sim_noisy=sim_noisy,
+        ...     hw_raw=hw_raw,
+        ...     hw_zne=hw_zne,
+        ...     save_path="zne_comparison.png",
+        ... )
+    """
+    apply_style()
+
+    # Determine layout based on available data
+    has_hardware = hw_raw is not None and hw_zne is not None
+
+    if has_hardware:
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        axes = list(axes) + [None]  # Pad for consistent indexing
+
+    fig.suptitle("ZNE Benchmarking Study: H₂ Dissociation Curve",
+                 fontsize=14, fontweight="bold", y=1.02)
+
+    # Colors for each condition
+    colors = {
+        "fci": "#228833",         # Green
+        "sim_noiseless": "#4477AA",  # Blue
+        "sim_noisy": "#EE6677",   # Red
+        "hw_raw": "#CCBB44",      # Yellow
+        "hw_zne": "#AA3377",      # Purple
+    }
+
+    # === Panel (a): Energy curves ===
+    ax_a = axes[0]
+
+    ax_a.plot(bond_lengths, fci_energies, "-", color=colors["fci"],
+              linewidth=2.5, label="FCI (exact)")
+    ax_a.plot(bond_lengths, sim_noiseless, "o--", color=colors["sim_noiseless"],
+              linewidth=1.5, markersize=6, label="Simulator (noiseless)")
+    ax_a.plot(bond_lengths, sim_noisy, "s--", color=colors["sim_noisy"],
+              linewidth=1.5, markersize=6, label="Simulator (IBM noise)")
+
+    if has_hardware:
+        ax_a.plot(bond_lengths, hw_raw, "^-", color=colors["hw_raw"],
+                  linewidth=2, markersize=8, label="Hardware (raw)")
+        ax_a.plot(bond_lengths, hw_zne, "D-", color=colors["hw_zne"],
+                  linewidth=2, markersize=8, label="Hardware (ZNE)")
+
+    ax_a.set_xlabel("Bond Length (Å)")
+    ax_a.set_ylabel("Energy (Hartree)")
+    ax_a.set_title("(a) Potential Energy Curves")
+    ax_a.legend(loc="upper right", framealpha=0.9)
+    ax_a.grid(True, alpha=0.3)
+
+    # Mark equilibrium
+    eq_idx = np.argmin(fci_energies)
+    ax_a.axvline(bond_lengths[eq_idx], color="gray", linestyle=":", alpha=0.5)
+
+    # === Panel (b): Error curves ===
+    ax_b = axes[1]
+
+    # Convert errors to mHa
+    err_noiseless = np.abs(sim_noiseless - fci_energies) * 1000
+    err_noisy = np.abs(sim_noisy - fci_energies) * 1000
+
+    ax_b.plot(bond_lengths, err_noiseless, "o-", color=colors["sim_noiseless"],
+              linewidth=1.5, markersize=6, label="Simulator (noiseless)")
+    ax_b.plot(bond_lengths, err_noisy, "s-", color=colors["sim_noisy"],
+              linewidth=1.5, markersize=6, label="Simulator (IBM noise)")
+
+    if has_hardware:
+        err_raw = np.abs(hw_raw - fci_energies) * 1000
+        err_zne = np.abs(hw_zne - fci_energies) * 1000
+        ax_b.plot(bond_lengths, err_raw, "^-", color=colors["hw_raw"],
+                  linewidth=2, markersize=8, label="Hardware (raw)")
+        ax_b.plot(bond_lengths, err_zne, "D-", color=colors["hw_zne"],
+                  linewidth=2, markersize=8, label="Hardware (ZNE)")
+
+    # Chemical accuracy line
+    ax_b.axhline(1.6, color="green", linestyle="--", alpha=0.7,
+                 label="Chemical accuracy")
+
+    ax_b.set_xlabel("Bond Length (Å)")
+    ax_b.set_ylabel("Error |E - E_FCI| (mHa)")
+    ax_b.set_title("(b) VQE Error vs Bond Length")
+    ax_b.legend(loc="upper right", framealpha=0.9)
+    ax_b.grid(True, alpha=0.3)
+    ax_b.set_yscale("log")
+
+    # === Panel (c): ZNE improvement (only if hardware data available) ===
+    if has_hardware and axes[2] is not None:
+        ax_c = axes[2]
+
+        # Improvement factor: error_raw / error_zne
+        # > 1 means ZNE helped, < 1 means ZNE made it worse
+        err_raw = np.abs(hw_raw - fci_energies)
+        err_zne = np.abs(hw_zne - fci_energies)
+
+        # Avoid division by zero
+        improvement = np.where(err_zne > 1e-10, err_raw / err_zne, 0)
+
+        bars = ax_c.bar(bond_lengths, improvement, width=0.15,
+                        color=colors["hw_zne"], edgecolor="black", linewidth=1)
+
+        # Reference line at 1.0 (no improvement)
+        ax_c.axhline(1.0, color="gray", linestyle="--", linewidth=2,
+                     label="No improvement")
+
+        # Color bars based on improvement
+        for bar, imp in zip(bars, improvement):
+            if imp > 1:
+                bar.set_facecolor("#228833")  # Green for improvement
+            else:
+                bar.set_facecolor("#EE6677")  # Red for degradation
+
+        ax_c.set_xlabel("Bond Length (Å)")
+        ax_c.set_ylabel("Improvement Factor")
+        ax_c.set_title("(c) ZNE Improvement (error_raw / error_ZNE)")
+        ax_c.legend(loc="upper right")
+        ax_c.grid(True, alpha=0.3, axis="y")
+
+        # Add value labels
+        for bar, imp in zip(bars, improvement):
+            height = bar.get_height()
+            ax_c.text(bar.get_x() + bar.get_width() / 2, height,
+                      f"{imp:.2f}x", ha="center", va="bottom", fontsize=9,
+                      fontweight="bold")
+
+    plt.tight_layout()
+
+    if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"ZNE comparison figure saved to: {save_path}")
+
+    return fig
+
+
 if __name__ == "__main__":
     # Demo with sample data
     print("Creating sample visualization...")

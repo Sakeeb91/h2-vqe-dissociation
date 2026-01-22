@@ -14,12 +14,19 @@ Modules:
     noise: IBM-like noise models
     dissociation: Dissociation curve computation
     visualization: Plotting utilities
+    ibm_runtime: IBM Quantum hardware integration (optional)
 
 Example:
     >>> from h2_vqe import compute_h2_integrals, run_vqe
     >>> mol_data = compute_h2_integrals(0.74)
     >>> result = run_vqe(mol_data)
     >>> print(f"VQE Energy: {result.energy:.6f} Ha")
+
+Example with noise:
+    >>> from h2_vqe import compute_h2_integrals, run_vqe, create_noise_model
+    >>> mol_data = compute_h2_integrals(0.74)
+    >>> noise = create_noise_model("ibm_like")
+    >>> result = run_vqe(mol_data, noise_model=noise)
 """
 
 __version__ = "0.1.0"

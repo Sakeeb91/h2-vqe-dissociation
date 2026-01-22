@@ -19,6 +19,7 @@ from analyze_zne_results import (
     analyze_results,
     generate_latex_table,
     export_to_csv,
+    validate_results,
 )
 
 
@@ -233,6 +234,49 @@ class TestGenerateLatexTable:
 
         assert "Hardware" in latex or "raw" in latex.lower()
         assert "ZNE" in latex
+
+
+class TestValidateResults:
+    """Tests for validate_results function."""
+
+    def test_valid_results_no_warnings(self, sample_results):
+        """Should return empty list for valid results."""
+        warnings = validate_results(sample_results)
+        assert warnings == []
+
+    def test_missing_required_key(self):
+        """Should warn about missing required keys."""
+        incomplete = {"fci": [-1.1, -1.2]}  # Missing bond_lengths
+        warnings = validate_results(incomplete)
+        assert any("bond_lengths" in w for w in warnings)
+
+    def test_array_length_mismatch(self):
+        """Should warn about mismatched array lengths."""
+        mismatched = {
+            "bond_lengths": [0.5, 0.74, 1.0],
+            "fci": [-1.1, -1.2],  # Wrong length
+        }
+        warnings = validate_results(mismatched)
+        assert any("length mismatch" in w.lower() for w in warnings)
+
+    def test_nan_values(self):
+        """Should warn about NaN values."""
+        with_nan = {
+            "bond_lengths": [0.5, 0.74],
+            "fci": [-1.1, float("nan")],
+        }
+        warnings = validate_results(with_nan)
+        assert any("nan" in w.lower() for w in warnings)
+
+    def test_incomplete_hardware_data(self):
+        """Should warn about incomplete hardware data."""
+        incomplete_hw = {
+            "bond_lengths": [0.5, 0.74],
+            "fci": [-1.1, -1.2],
+            "hw_raw": [-1.0, -1.1],  # No hw_zne
+        }
+        warnings = validate_results(incomplete_hw)
+        assert any("zne" in w.lower() for w in warnings)
 
 
 class TestExportToCSV:

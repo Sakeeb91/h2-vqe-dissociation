@@ -40,6 +40,10 @@ dev = [
     "black>=23.0",
     "ruff>=0.1.0",
 ]
+ibm = [
+    # For running on real IBM Quantum hardware
+    "qiskit-ibm-runtime>=0.20",
+]
 
 [project.urls]
 Homepage = "https://github.com/username/h2-vqe-dissociation"

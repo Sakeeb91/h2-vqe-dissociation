@@ -28,6 +28,7 @@ from scipy.optimize import minimize
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp, Statevector
 from qiskit_aer import AerSimulator
+from qiskit_aer.noise import NoiseModel
 from qiskit.primitives import StatevectorEstimator
 
 from h2_vqe.molecular import MolecularData
@@ -84,6 +85,7 @@ class VQEEngine:
         ansatz: BaseAnsatz,
         backend: Literal["statevector", "aer_simulator"] = "statevector",
         shots: int = 1024,
+        noise_model: Optional[NoiseModel] = None,
     ):
         """
         Initialize VQE engine.
@@ -93,13 +95,15 @@ class VQEEngine:
             ansatz: Variational ansatz circuit
             backend: Simulation backend
                 - "statevector": Exact statevector simulation (noiseless)
-                - "aer_simulator": Shot-based simulation
+                - "aer_simulator": Shot-based simulation (supports noise)
             shots: Number of measurement shots (for aer_simulator)
+            noise_model: Optional Qiskit NoiseModel for realistic simulation
         """
         self.hamiltonian = hamiltonian
         self.ansatz = ansatz
         self.backend_type = backend
         self.shots = shots
+        self.noise_model = noise_model
 
         self._n_evaluations = 0
         self._energy_history: List[float] = []
@@ -108,7 +112,11 @@ class VQEEngine:
         if backend == "statevector":
             self._estimator = StatevectorEstimator()
         else:
-            self._simulator = AerSimulator()
+            # Create AerSimulator with optional noise model
+            if noise_model is not None:
+                self._simulator = AerSimulator(noise_model=noise_model)
+            else:
+                self._simulator = AerSimulator()
 
     def compute_energy(self, parameters: np.ndarray) -> float:
         """
@@ -148,13 +156,17 @@ class VQEEngine:
         return float(energy)
 
     def _compute_shot_energy(self, circuit: QuantumCircuit) -> float:
-        """Compute energy using shot-based measurement."""
-        # Use the estimator primitive for shot-based estimation
-        # This is a simplified implementation
-        from qiskit.primitives import StatevectorEstimator
+        """Compute energy using shot-based measurement with optional noise."""
+        from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
-        estimator = StatevectorEstimator()
-        job = estimator.run([(circuit, self.hamiltonian.operator)])
+        # Create Aer Estimator with the simulator (which may have noise)
+        estimator = AerEstimator.from_backend(self._simulator)
+
+        # Set default precision based on shots (precision ~ 1/sqrt(shots))
+        default_precision = 1.0 / np.sqrt(self.shots)
+
+        # Run estimation
+        job = estimator.run([(circuit, self.hamiltonian.operator)], precision=default_precision)
         result = job.result()
         energy = result[0].data.evs
 
@@ -236,6 +248,7 @@ def run_vqe(
     initial_params: Optional[np.ndarray] = None,
     backend: Literal["statevector", "aer_simulator"] = "statevector",
     shots: int = 1024,
+    noise_model: Optional[NoiseModel] = None,
     **ansatz_kwargs,
 ) -> VQEResult:
     """
@@ -253,6 +266,7 @@ def run_vqe(
         initial_params: Initial parameter values (default: zeros)
         backend: Simulation backend ("statevector" or "aer_simulator")
         shots: Number of measurement shots (for aer_simulator)
+        noise_model: Optional NoiseModel for realistic simulation (requires aer_simulator backend)
         **ansatz_kwargs: Additional arguments for ansatz constructor
 
     Returns:
@@ -263,7 +277,16 @@ def run_vqe(
         >>> result = run_vqe(data, ansatz_type="uccsd")
         >>> print(f"Energy: {result.energy:.6f} Ha")
         >>> print(f"Error:  {result.error:.2e} Ha")
+
+    Example with noise:
+        >>> from h2_vqe.noise import create_noise_model
+        >>> noise = create_noise_model("ibm_like")
+        >>> result = run_vqe(data, backend="aer_simulator", noise_model=noise)
     """
+    # If noise_model is provided, force aer_simulator backend
+    if noise_model is not None and backend == "statevector":
+        backend = "aer_simulator"
+
     # Build qubit Hamiltonian
     qubit_ham = build_qubit_hamiltonian(mol_data)
 
@@ -276,6 +299,7 @@ def run_vqe(
         ansatz=ansatz,
         backend=backend,
         shots=shots,
+        noise_model=noise_model,
     )
 
     # Run optimization
@@ -292,18 +316,21 @@ def run_vqe_multistart(
     mol_data: MolecularData,
     ansatz_type: str = "uccsd",
     n_starts: int = 5,
+    noise_model: Optional[NoiseModel] = None,
     **kwargs,
 ) -> VQEResult:
     """
     Run VQE with multiple random initializations.
 
     This helps avoid local minima by trying multiple starting points
-    and returning the best result.
+    and returning the best result. Especially useful with noisy simulations
+    where optimization landscapes can be more complex.
 
     Args:
         mol_data: Molecular data
         ansatz_type: Type of ansatz
         n_starts: Number of random initializations
+        noise_model: Optional NoiseModel for realistic simulation
         **kwargs: Additional arguments for run_vqe
 
     Returns:
@@ -326,6 +353,7 @@ def run_vqe_multistart(
             mol_data,
             ansatz_type=ansatz_type,
             initial_params=init_params,
+            noise_model=noise_model,
             **kwargs,
         )
 

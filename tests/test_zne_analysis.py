@@ -18,6 +18,7 @@ from analyze_zne_results import (
     compute_rmse,
     analyze_results,
     generate_latex_table,
+    export_to_csv,
 )
 
 
@@ -232,6 +233,43 @@ class TestGenerateLatexTable:
 
         assert "Hardware" in latex or "raw" in latex.lower()
         assert "ZNE" in latex
+
+
+class TestExportToCSV:
+    """Tests for export_to_csv function."""
+
+    def test_creates_file(self, sample_results, tmp_path):
+        """Should create CSV file."""
+        metrics = analyze_results(sample_results, verbose=False)
+        output_path = tmp_path / "test_output.csv"
+
+        export_to_csv(sample_results, metrics, str(output_path))
+
+        assert output_path.exists()
+
+    def test_file_has_header(self, sample_results, tmp_path):
+        """CSV should have header row."""
+        metrics = analyze_results(sample_results, verbose=False)
+        output_path = tmp_path / "test_output.csv"
+
+        export_to_csv(sample_results, metrics, str(output_path))
+
+        with open(output_path, "r") as f:
+            first_line = f.readline()
+            assert "bond_length" in first_line
+            assert "fci" in first_line
+
+    def test_file_has_data_rows(self, sample_results, tmp_path):
+        """CSV should have data rows for each bond length."""
+        metrics = analyze_results(sample_results, verbose=False)
+        output_path = tmp_path / "test_output.csv"
+
+        export_to_csv(sample_results, metrics, str(output_path))
+
+        with open(output_path, "r") as f:
+            lines = f.readlines()
+            # Header + 5 data rows + blank + summary header + summary rows
+            assert len(lines) > 6
 
 
 if __name__ == "__main__":

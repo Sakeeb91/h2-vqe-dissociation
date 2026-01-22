@@ -289,6 +289,68 @@ def analyze_results(results: dict, verbose: bool = True) -> dict:
     return metrics
 
 
+def export_to_csv(results: dict, metrics: dict, output_path: str):
+    """Export results and metrics to CSV format."""
+    import csv
+
+    bond_lengths = results["bond_lengths"]
+    fci = results["fci"]
+
+    # Create header and data rows
+    headers = ["bond_length", "fci"]
+    data_keys = ["fci"]
+
+    if "sim_noiseless" in results:
+        headers.extend(["sim_noiseless", "error_noiseless_mHa"])
+        data_keys.append("sim_noiseless")
+
+    if "sim_noisy" in results:
+        headers.extend(["sim_noisy", "error_noisy_mHa"])
+        data_keys.append("sim_noisy")
+
+    if "hw_raw" in results:
+        headers.extend(["hw_raw", "error_raw_mHa"])
+        data_keys.append("hw_raw")
+
+    if "hw_zne" in results:
+        headers.extend(["hw_zne", "error_zne_mHa"])
+        data_keys.append("hw_zne")
+
+    # Write data
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+
+        for i, r in enumerate(bond_lengths):
+            row = [r, fci[i]]
+
+            for key in data_keys[1:]:  # Skip fci
+                if key in results:
+                    energy = results[key][i]
+                    error = abs(energy - fci[i]) * 1000
+                    row.extend([energy, error])
+
+            writer.writerow(row)
+
+        # Add summary row
+        writer.writerow([])
+        writer.writerow(["# Summary Metrics (MAE in mHa)"])
+
+        if "sim_noiseless" in metrics:
+            writer.writerow(["Noiseless MAE", metrics["sim_noiseless"]["mae_mHa"]])
+        if "sim_noisy" in metrics:
+            writer.writerow(["Noisy MAE", metrics["sim_noisy"]["mae_mHa"]])
+        if "hw_raw" in metrics:
+            writer.writerow(["Hardware raw MAE", metrics["hw_raw"]["mae_mHa"]])
+        if "hw_zne" in metrics:
+            writer.writerow(["Hardware ZNE MAE", metrics["hw_zne"]["mae_mHa"]])
+        if "zne_improvement" in metrics:
+            writer.writerow(["ZNE improvement factor", metrics["zne_improvement"]["mae_factor"]])
+
+    print(f"CSV exported to: {output_path}")
+
+
 def generate_latex_table(metrics: dict) -> str:
     """Generate LaTeX table from analysis metrics."""
     lines = [
@@ -367,6 +429,12 @@ def main():
         help="Save computed metrics to JSON file",
     )
     parser.add_argument(
+        "--csv",
+        type=str,
+        default=None,
+        help="Export results to CSV file",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress console output",
@@ -387,6 +455,10 @@ def main():
         with open(args.output_metrics, "w") as f:
             json.dump(metrics, f, indent=2)
         print(f"\nMetrics saved to: {args.output_metrics}")
+
+    # Export CSV if requested
+    if args.csv:
+        export_to_csv(results, metrics, args.csv)
 
     # Generate LaTeX table if requested
     if args.latex:

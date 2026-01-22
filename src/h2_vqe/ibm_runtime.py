@@ -320,6 +320,103 @@ def run_vqe_on_hardware(
     )
 
 
+def run_vqe_resilience_sweep(
+    mol_data,
+    ansatz_type: str = "noise_aware",
+    resilience_levels: List[int] = [0, 1, 2],
+    backend_name: Optional[str] = None,
+    service: Optional["QiskitRuntimeService"] = None,
+    maxiter: int = 30,
+    shots: int = 4096,
+    optimization_level: int = 3,
+) -> dict:
+    """
+    Run VQE at multiple error mitigation levels for comparison.
+
+    This function enables benchmarking of IBM's built-in error mitigation
+    strategies by running the same VQE optimization at different resilience
+    levels and comparing results.
+
+    Args:
+        mol_data: Molecular data from compute_h2_integrals
+        ansatz_type: Type of ansatz (recommend "noise_aware" for NISQ)
+        resilience_levels: List of resilience levels to test
+            0 = raw (no mitigation)
+            1 = M3 readout error mitigation
+            2 = ZNE (zero-noise extrapolation)
+        backend_name: Specific backend to use (None = least busy)
+        service: QiskitRuntimeService (None = create new)
+        maxiter: Maximum optimizer iterations
+        shots: Number of measurement shots
+        optimization_level: Transpilation optimization (0-3)
+
+    Returns:
+        Dict mapping resilience_level -> HardwareResult
+
+    Example:
+        >>> from h2_vqe.molecular import compute_h2_integrals
+        >>> mol_data = compute_h2_integrals(0.74)
+        >>> results = run_vqe_resilience_sweep(mol_data, resilience_levels=[0, 2])
+        >>> print(f"Raw: {results[0].energy:.6f} Ha")
+        >>> print(f"ZNE: {results[2].energy:.6f} Ha")
+
+    Notes:
+        - ZNE (level 2) requires approximately 3x more circuit executions
+        - Running all levels sequentially may take significant queue time
+        - Consider using the same initial parameters for fair comparison
+    """
+    if not check_ibm_runtime():
+        raise RuntimeError("qiskit-ibm-runtime not available")
+
+    # Get service
+    if service is None:
+        service = get_service()
+
+    # Get backend
+    if backend_name is None:
+        backend_name = get_least_busy_backend(service)
+        print(f"Using least busy backend: {backend_name}")
+
+    print(f"Running resilience sweep on {backend_name}")
+    print(f"  Resilience levels: {resilience_levels}")
+    print(f"  Ansatz: {ansatz_type}")
+    print(f"  Max iterations: {maxiter}")
+    print(f"  Shots: {shots}")
+    print("-" * 50)
+
+    results = {}
+
+    for level in resilience_levels:
+        level_name = {0: "raw", 1: "M3 (readout)", 2: "ZNE"}
+        print(f"\n[{level_name.get(level, f'level {level}')}] Running resilience_level={level}...")
+
+        result = run_vqe_on_hardware(
+            mol_data,
+            ansatz_type=ansatz_type,
+            backend_name=backend_name,
+            service=service,
+            maxiter=maxiter,
+            shots=shots,
+            optimization_level=optimization_level,
+            resilience_level=level,
+        )
+
+        results[level] = result
+        print(f"  Energy: {result.energy:.6f} Ha")
+        if result.error is not None:
+            print(f"  Error:  {result.error * 1000:.2f} mHa")
+
+    print("\n" + "=" * 50)
+    print("Resilience sweep complete!")
+    print("-" * 50)
+    for level, result in results.items():
+        level_name = {0: "raw", 1: "M3", 2: "ZNE"}
+        error_str = f", error={result.error * 1000:.2f} mHa" if result.error else ""
+        print(f"  Level {level} ({level_name.get(level, '?'):4s}): E={result.energy:.6f} Ha{error_str}")
+
+    return results
+
+
 def run_single_point_hardware(
     mol_data,
     parameters: np.ndarray,

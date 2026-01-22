@@ -9,12 +9,18 @@ methods (Hartree-Fock, FCI) and noise analysis.
 Modules:
     molecular: PySCF interface for molecular integrals
     hamiltonian: Jordan-Wigner transformation
-    ansatz: Variational circuit ansatze
-    vqe: VQE optimization engine
-    noise: IBM-like noise models
+    ansatz: Variational circuit ansatze (UCCSD, hardware-efficient, noise-aware)
+    vqe: VQE optimization engine with noise model support
+    noise: IBM-like noise models (ideal, low_noise, ibm_like, high_noise)
     dissociation: Dissociation curve computation
-    visualization: Plotting utilities
-    ibm_runtime: IBM Quantum hardware integration (optional)
+    visualization: Plotting utilities including ZNE comparison plots
+    ibm_runtime: IBM Quantum hardware integration with ZNE support (optional)
+
+Features:
+    - Noise simulation with configurable IBM-like noise models
+    - IBM Quantum hardware integration with error mitigation
+    - ZNE (Zero-Noise Extrapolation) benchmarking support
+    - Publication-quality visualization
 
 Example:
     >>> from h2_vqe import compute_h2_integrals, run_vqe
@@ -27,6 +33,10 @@ Example with noise:
     >>> mol_data = compute_h2_integrals(0.74)
     >>> noise = create_noise_model("ibm_like")
     >>> result = run_vqe(mol_data, noise_model=noise)
+
+For hardware experiments:
+    >>> from h2_vqe.ibm_runtime import run_vqe_on_hardware, run_vqe_resilience_sweep
+    >>> result = run_vqe_on_hardware(mol_data, ansatz_type="noise_aware")
 """
 
 __version__ = "0.1.0"

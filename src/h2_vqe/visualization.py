@@ -429,11 +429,127 @@ def plot_convergence_landscape(
     return fig
 
 
+def compute_noise_resilience_data(
+    ansatz_types: List[str] = ["uccsd", "hardware_efficient", "noise_aware"],
+    noise_presets: List[str] = ["ideal", "low_noise", "ibm_like", "high_noise"],
+    bond_length: float = 0.74,
+    maxiter: int = 100,
+    shots: int = 4096,
+    n_starts: int = 1,
+    verbose: bool = True,
+) -> dict:
+    """
+    Compute noise resilience data for all ansatz/noise combinations.
+
+    This function runs VQE experiments and returns structured data that can
+    be saved to JSON and/or visualized with plot_noise_resilience_heatmap.
+
+    Args:
+        ansatz_types: List of ansatz types to compare
+        noise_presets: List of noise preset names
+        bond_length: H₂ bond length to compute at (default: equilibrium)
+        maxiter: Maximum optimizer iterations (lower for noisy to help convergence)
+        shots: Number of measurement shots for noisy simulations
+        n_starts: Number of random restarts (helps with noisy optimization)
+        verbose: Print progress updates
+
+    Returns:
+        Dictionary containing:
+            - error_matrix: 2D numpy array (ansatz x noise)
+            - energy_matrix: 2D numpy array of final energies
+            - ansatz_types: List of ansatz names
+            - noise_presets: List of noise preset names
+            - bond_length: Bond length used
+            - fci_energy: Exact FCI energy for reference
+            - metadata: Dict with computation parameters
+
+    Example:
+        >>> data = compute_noise_resilience_data()
+        >>> import json
+        >>> with open("results.json", "w") as f:
+        ...     json.dump(data, f, default=lambda x: x.tolist())
+    """
+    from h2_vqe.molecular import compute_h2_integrals
+    from h2_vqe.vqe import run_vqe, run_vqe_multistart
+    from h2_vqe.noise import create_noise_model
+
+    # Compute molecular data once
+    mol_data = compute_h2_integrals(bond_length)
+
+    # Build matrices: rows = ansatz, cols = noise level
+    n_ansatz = len(ansatz_types)
+    n_noise = len(noise_presets)
+    error_matrix = np.zeros((n_ansatz, n_noise))
+    energy_matrix = np.zeros((n_ansatz, n_noise))
+
+    if verbose:
+        print(f"Computing noise resilience data at r = {bond_length} Å")
+        print(f"FCI energy: {mol_data.fci_energy:.6f} Ha")
+        print(f"Ansatze: {ansatz_types}")
+        print(f"Noise levels: {noise_presets}")
+        print("-" * 60)
+
+    for i, ansatz in enumerate(ansatz_types):
+        for j, noise_preset in enumerate(noise_presets):
+            # Determine noise model and backend
+            if noise_preset == "ideal":
+                noise_model = None
+                backend = "statevector"
+            else:
+                noise_model = create_noise_model(noise_preset)
+                backend = "aer_simulator"
+
+            # Run VQE (with multistart if n_starts > 1)
+            if n_starts > 1:
+                result = run_vqe_multistart(
+                    mol_data,
+                    ansatz_type=ansatz,
+                    n_starts=n_starts,
+                    noise_model=noise_model,
+                    backend=backend,
+                    shots=shots,
+                    maxiter=maxiter,
+                )
+            else:
+                result = run_vqe(
+                    mol_data,
+                    ansatz_type=ansatz,
+                    noise_model=noise_model,
+                    backend=backend,
+                    shots=shots,
+                    maxiter=maxiter,
+                )
+
+            # Store results
+            error_matrix[i, j] = result.error * 1000  # Convert to mHa
+            energy_matrix[i, j] = result.energy
+
+            if verbose:
+                print(f"  {ansatz:20s} | {noise_preset:12s}: "
+                      f"E={result.energy:.6f} Ha, error={error_matrix[i, j]:6.2f} mHa")
+
+    return {
+        "error_matrix": error_matrix,
+        "energy_matrix": energy_matrix,
+        "ansatz_types": ansatz_types,
+        "noise_presets": noise_presets,
+        "bond_length": bond_length,
+        "fci_energy": mol_data.fci_energy,
+        "metadata": {
+            "maxiter": maxiter,
+            "shots": shots,
+            "n_starts": n_starts,
+        }
+    }
+
+
 def plot_noise_resilience_heatmap(
+    data: Optional[dict] = None,
     ansatz_types: List[str] = ["uccsd", "hardware_efficient", "noise_aware"],
     noise_presets: List[str] = ["ideal", "low_noise", "ibm_like", "high_noise"],
     bond_length: float = 0.74,
     save_path: Optional[str] = None,
+    **compute_kwargs,
 ) -> Figure:
     """
     Create a heatmap showing VQE error across ansatz types and noise levels.
@@ -442,80 +558,81 @@ def plot_noise_resilience_heatmap(
     and is directly relevant to quantum hardware benchmarking.
 
     Args:
-        ansatz_types: List of ansatz types to compare
-        noise_presets: List of noise preset names
+        data: Pre-computed data from compute_noise_resilience_data() (optional)
+              If None, will compute data using provided parameters
+        ansatz_types: List of ansatz types to compare (if computing)
+        noise_presets: List of noise preset names (if computing)
         bond_length: H₂ bond length to compute at (default: equilibrium)
         save_path: Optional path to save figure
+        **compute_kwargs: Additional arguments for compute_noise_resilience_data()
 
     Returns:
         matplotlib Figure with heatmap
 
     Example:
+        >>> # Compute and plot in one call
         >>> fig = plot_noise_resilience_heatmap()
         >>> fig.savefig("noise_resilience.png", dpi=300)
-    """
-    from h2_vqe.molecular import compute_h2_integrals
-    from h2_vqe.vqe import run_vqe
-    from h2_vqe.noise import create_noise_model
 
+        >>> # Or compute separately and plot
+        >>> data = compute_noise_resilience_data()
+        >>> fig = plot_noise_resilience_heatmap(data=data)
+    """
     apply_style()
 
-    # Compute molecular data once
-    mol_data = compute_h2_integrals(bond_length)
+    # Compute data if not provided
+    if data is None:
+        data = compute_noise_resilience_data(
+            ansatz_types=ansatz_types,
+            noise_presets=noise_presets,
+            bond_length=bond_length,
+            **compute_kwargs,
+        )
 
-    # Build error matrix: rows = ansatz, cols = noise level
-    n_ansatz = len(ansatz_types)
-    n_noise = len(noise_presets)
-    error_matrix = np.zeros((n_ansatz, n_noise))
+    # Extract data
+    error_matrix = np.array(data["error_matrix"])
+    ansatz_list = data["ansatz_types"]
+    noise_list = data["noise_presets"]
+    r = data["bond_length"]
 
-    print(f"Computing noise resilience heatmap at r = {bond_length} Å...")
-
-    for i, ansatz in enumerate(ansatz_types):
-        for j, noise_preset in enumerate(noise_presets):
-            # Create noise model
-            noise_model = create_noise_model(noise_preset)
-
-            # Run VQE with this ansatz and noise level
-            result = run_vqe(
-                mol_data,
-                ansatz_type=ansatz,
-                noise_model=noise_model if noise_preset != "ideal" else None,
-            )
-
-            # Store error in mHa
-            error_matrix[i, j] = result.error * 1000
-            print(f"  {ansatz:20s} | {noise_preset:12s}: {error_matrix[i, j]:6.2f} mHa")
+    n_ansatz = len(ansatz_list)
+    n_noise = len(noise_list)
 
     # Create heatmap
     fig, ax = plt.subplots(figsize=(10, 6))
 
+    # Use diverging colormap centered appropriately
     im = ax.imshow(error_matrix, cmap="RdYlGn_r", aspect="auto")
 
     # Set ticks and labels
     ax.set_xticks(np.arange(n_noise))
     ax.set_yticks(np.arange(n_ansatz))
-    ax.set_xticklabels([preset.replace("_", "\n") for preset in noise_presets])
-    ax.set_yticklabels(ansatz_types)
+    ax.set_xticklabels([preset.replace("_", "\n") for preset in noise_list])
+    ax.set_yticklabels(ansatz_list)
 
     # Add colorbar
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label("VQE Error (mHa)", rotation=270, labelpad=20)
 
-    # Add text annotations
+    # Add text annotations with adaptive coloring
     for i in range(n_ansatz):
         for j in range(n_noise):
-            text = ax.text(j, i, f"{error_matrix[i, j]:.1f}",
-                          ha="center", va="center", color="black", fontsize=10)
+            val = error_matrix[i, j]
+            # Use white text for dark cells, black for light cells
+            text_color = "white" if val > np.median(error_matrix) else "black"
+            ax.text(j, i, f"{val:.1f}",
+                   ha="center", va="center", color=text_color, fontsize=10,
+                   fontweight="bold")
 
     ax.set_xlabel("Noise Level")
     ax.set_ylabel("Ansatz Type")
-    ax.set_title(f"Noise Resilience Heatmap (H₂ at r = {bond_length} Å)")
+    ax.set_title(f"Noise Resilience Heatmap (H₂ at r = {r} Å)")
 
     plt.tight_layout()
 
     if save_path:
         fig.savefig(save_path, dpi=300, bbox_inches="tight")
-        print(f"\nHeatmap saved to: {save_path}")
+        print(f"Heatmap saved to: {save_path}")
 
     return fig
 

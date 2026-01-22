@@ -9,7 +9,7 @@
 **Repository**: `/Users/sakeeb/Code repositories/h2-vqe-dissociation`
 **GitHub**: `https://github.com/Sakeeb91/h2-vqe-dissociation`
 
-A Variational Quantum Eigensolver (VQE) implementation for computing H₂ molecular dissociation curves, with noise simulation and IBM Quantum hardware integration.
+A Variational Quantum Eigensolver (VQE) implementation for computing H₂ molecular dissociation curves, with noise simulation, IBM Quantum hardware integration, and ZNE benchmarking support.
 
 ---
 
@@ -25,216 +25,63 @@ A Variational Quantum Eigensolver (VQE) implementation for computing H₂ molecu
 | VQE Engine with noise support | `src/h2_vqe/vqe.py` | Complete |
 | Noise models (IBM-like presets) | `src/h2_vqe/noise.py` | Complete |
 | Dissociation curve computation | `src/h2_vqe/dissociation.py` | Complete |
-| Visualization (heatmaps, curves) | `src/h2_vqe/visualization.py` | Complete |
+| Visualization (heatmaps, curves, ZNE) | `src/h2_vqe/visualization.py` | Complete |
 | IBM Runtime integration | `src/h2_vqe/ibm_runtime.py` | Complete |
-| Noise experiment script | `scripts/run_noise_experiment.py` | Complete |
-| Hardware experiment script | `scripts/run_hardware_experiment.py` | Complete |
-| Tests | `tests/` | 119 tests passing |
+| **ZNE benchmark script** | `scripts/run_zne_benchmark.py` | **Complete** |
+| **ZNE analysis script** | `scripts/analyze_zne_results.py` | **Complete** |
+| Tests | `tests/` | 161 tests passing |
 
-### Recent Commits (8 atomic commits pushed)
+### ZNE Benchmarking Study - IMPLEMENTED ✅
 
-```
-7f3a8e5 Add tests for noisy VQE execution
-7c9c787 Update package docstring to document noise and hardware features
-fc5b47a Add IBM Quantum hardware experiment runner script
-f55c44d Add IBM Quantum Runtime integration module
-ee22c14 Add qiskit-ibm-runtime as optional dependency
-b8c8017 Add noise resilience experiment runner script
-43023bb Add compute_noise_resilience_data function and improve heatmap plotting
-c1a0f01 Add noise_model parameter to VQE engine and run_vqe function
-```
+The ZNE benchmarking study is now fully implemented:
 
----
-
-## Next Phase: ZNE Benchmarking Study
-
-### Scientific Goal
-
-**Research Question**: *"How effective is Zero-Noise Extrapolation (ZNE) for VQE on real IBM Quantum hardware?"*
-
-### Study Design
-
-Compare H₂ dissociation curves across 5 conditions:
-
-| Condition | Source | Purpose |
-|-----------|--------|---------|
-| FCI (exact) | Classical | Ground truth |
-| Simulator (noiseless) | Qiskit Aer statevector | VQE accuracy baseline |
-| Simulator (IBM noise) | Qiskit Aer + noise model | Predicted hardware performance |
-| Hardware (raw) | IBM Quantum, resilience_level=0 | Actual NISQ performance |
-| Hardware (ZNE) | IBM Quantum, resilience_level=2 | Error-mitigated performance |
-
-### Key Metrics to Compute
-
-1. **Prediction accuracy**: |E_simulator_noisy - E_hardware_raw|
-2. **ZNE improvement**: |E_hardware_raw - E_FCI| vs |E_hardware_ZNE - E_FCI|
-3. **Shot overhead**: Shots needed for ZNE vs raw
-4. **Dissociation curve quality**: Can we capture the equilibrium geometry?
+| Component | Status |
+|-----------|--------|
+| `run_vqe_resilience_sweep()` | ✅ Added to ibm_runtime.py |
+| `run_zne_benchmark.py` | ✅ Full benchmarking script |
+| `plot_zne_comparison()` | ✅ 3-panel publication figure |
+| `analyze_zne_results.py` | ✅ Metrics + LaTeX + CSV export |
+| Tests | ✅ 42 new tests (161 total) |
+| Examples | ✅ Quick demo + sample data |
 
 ---
 
-## Implementation Tasks
+## Quick Start Commands
 
-### Task 1: Update `ibm_runtime.py` for ZNE Sweeps
+### Run Simulator-Only ZNE Benchmark
+```bash
+# Quick demo (~30 seconds)
+python examples/quick_zne_demo.py
 
-Add function to run VQE at multiple resilience levels:
+# Full simulator benchmark
+python scripts/run_zne_benchmark.py --simulator-only
 
-```python
-def run_vqe_resilience_sweep(
-    mol_data,
-    ansatz_type: str = "noise_aware",
-    resilience_levels: List[int] = [0, 1, 2],
-    backend_name: Optional[str] = None,
-    service: Optional["QiskitRuntimeService"] = None,
-    maxiter: int = 30,
-    shots: int = 4096,
-) -> dict:
-    """
-    Run VQE at multiple error mitigation levels for comparison.
-
-    Args:
-        resilience_levels:
-            0 = raw (no mitigation)
-            1 = M3 readout error mitigation
-            2 = ZNE (zero-noise extrapolation)
-
-    Returns:
-        Dict mapping resilience_level -> HardwareResult
-    """
+# Dry run (show what would run)
+python scripts/run_zne_benchmark.py --dry-run
 ```
 
-### Task 2: Create `scripts/run_zne_benchmark.py`
+### Analyze Results
+```bash
+# Analyze sample results
+python scripts/analyze_zne_results.py examples/sample_zne_results.json
 
-Script to run the full ZNE benchmarking study:
+# Generate LaTeX table
+python scripts/analyze_zne_results.py results/zne_benchmark.json --latex
 
-```python
-#!/usr/bin/env python3
-"""
-ZNE Benchmarking Study
-======================
+# Export to CSV
+python scripts/analyze_zne_results.py results/zne_benchmark.json --csv results/data.csv
 
-Compare VQE performance across:
-1. Exact (FCI)
-2. Simulator (noiseless)
-3. Simulator (IBM-like noise)
-4. Hardware (raw, resilience_level=0)
-5. Hardware (ZNE, resilience_level=2)
-
-Usage:
-    python scripts/run_zne_benchmark.py --dry-run
-    python scripts/run_zne_benchmark.py --bond-lengths 0.5 0.74 1.0 1.5 2.0
-"""
-
-# Bond lengths to test (5 points capturing key physics)
-BOND_LENGTHS = [0.5, 0.74, 1.0, 1.5, 2.0]
-
-# Main workflow:
-# 1. Compute FCI energies at all bond lengths
-# 2. Run simulator (noiseless) VQE
-# 3. Run simulator (IBM-like noise) VQE
-# 4. Run hardware VQE with resilience_level=0 (raw)
-# 5. Run hardware VQE with resilience_level=2 (ZNE)
-# 6. Save results to JSON
-# 7. Generate comparison plots
+# Generate plot
+python scripts/analyze_zne_results.py results/zne_benchmark.json --plot
 ```
 
-### Task 3: Add ZNE Comparison Visualization
+### Run Hardware Benchmark (requires IBM credentials)
+```bash
+# Full benchmark (5 bond lengths, raw + ZNE)
+python scripts/run_zne_benchmark.py
 
-Add to `visualization.py`:
-
-```python
-def plot_zne_comparison(
-    bond_lengths: np.ndarray,
-    fci_energies: np.ndarray,
-    sim_noiseless: np.ndarray,
-    sim_noisy: np.ndarray,
-    hw_raw: np.ndarray,
-    hw_zne: np.ndarray,
-    save_path: Optional[str] = None,
-) -> Figure:
-    """
-    Create comparison plot showing ZNE effectiveness.
-
-    Panels:
-    (a) Energy curves for all 5 conditions
-    (b) Error vs bond length (|E - E_FCI|)
-    (c) ZNE improvement factor
-    """
-```
-
-### Task 4: Update Results Analysis
-
-Create `scripts/analyze_zne_results.py` to compute:
-
-```python
-# Metrics to compute from results:
-
-# 1. Mean absolute error (MAE) for each condition
-mae_sim_noiseless = np.mean(np.abs(sim_noiseless - fci))
-mae_sim_noisy = np.mean(np.abs(sim_noisy - fci))
-mae_hw_raw = np.mean(np.abs(hw_raw - fci))
-mae_hw_zne = np.mean(np.abs(hw_zne - fci))
-
-# 2. ZNE improvement ratio
-zne_improvement = mae_hw_raw / mae_hw_zne  # >1 means ZNE helped
-
-# 3. Noise model accuracy
-noise_model_error = np.mean(np.abs(sim_noisy - hw_raw))
-
-# 4. Equilibrium geometry error
-eq_idx = np.argmin(fci)
-eq_error_raw = abs(hw_raw[eq_idx] - fci[eq_idx])
-eq_error_zne = abs(hw_zne[eq_idx] - fci[eq_idx])
-```
-
----
-
-## Key Code Locations
-
-### VQE with Noise Support
-
-```python
-# src/h2_vqe/vqe.py - run_vqe() signature
-def run_vqe(
-    mol_data: MolecularData,
-    ansatz_type: str = "uccsd",
-    optimizer: str = "COBYLA",
-    maxiter: int = 200,
-    initial_params: Optional[np.ndarray] = None,
-    backend: Literal["statevector", "aer_simulator"] = "statevector",
-    shots: int = 1024,
-    noise_model: Optional[NoiseModel] = None,  # <-- Added
-    **ansatz_kwargs,
-) -> VQEResult:
-```
-
-### IBM Runtime Integration
-
-```python
-# src/h2_vqe/ibm_runtime.py - key function
-def run_vqe_on_hardware(
-    mol_data,
-    ansatz_type: str = "noise_aware",
-    backend_name: Optional[str] = None,
-    service: Optional["QiskitRuntimeService"] = None,
-    optimizer: str = "COBYLA",
-    maxiter: int = 50,
-    shots: int = 4096,
-    optimization_level: int = 3,
-    resilience_level: int = 1,  # <-- 0=raw, 1=M3, 2=ZNE
-) -> HardwareResult:
-```
-
-### Noise Model Presets
-
-```python
-# src/h2_vqe/noise.py - available presets
-NOISE_PRESETS = {
-    "ideal": NoiseParameters(single_qubit_error=0.0, two_qubit_error=0.0, ...),
-    "ibm_like": NoiseParameters(single_qubit_error=5e-4, two_qubit_error=1e-2, ...),
-    "low_noise": NoiseParameters(single_qubit_error=1e-4, two_qubit_error=5e-3, ...),
-    "high_noise": NoiseParameters(single_qubit_error=1e-3, two_qubit_error=5e-2, ...),
-}
+# Resume with hardware after simulator run
+python scripts/run_zne_benchmark.py --resume results/zne_benchmark.json --hardware-only
 ```
 
 ---
@@ -251,46 +98,54 @@ h2-vqe-dissociation/
 │   ├── vqe.py            # VQE engine (supports noise_model)
 │   ├── noise.py          # IBM-like noise models
 │   ├── dissociation.py   # Dissociation curve computation
-│   ├── visualization.py  # Plotting (heatmaps, curves)
-│   └── ibm_runtime.py    # IBM Quantum hardware integration
+│   ├── visualization.py  # Plotting (heatmaps, curves, ZNE)
+│   └── ibm_runtime.py    # IBM Quantum hardware + ZNE
 ├── scripts/
 │   ├── run_noise_experiment.py    # Simulator noise study
-│   └── run_hardware_experiment.py # IBM hardware runs
-├── tests/                # 119 tests
-├── results/              # Output directory (gitignored)
-├── pyproject.toml        # Dependencies (including [ibm] optional)
-└── CONTINUATION.md       # This file
+│   ├── run_hardware_experiment.py # IBM hardware runs
+│   ├── run_zne_benchmark.py       # ZNE benchmarking study
+│   ├── analyze_zne_results.py     # Results analysis
+│   └── test_zne_scripts.py        # Integration tests
+├── examples/
+│   ├── quick_zne_demo.py          # Quick simulator demo
+│   └── sample_zne_results.json    # Sample data for testing
+├── tests/                         # 161 tests
+├── results/                       # Output directory (gitignored)
+├── pyproject.toml                 # Dependencies
+└── CONTINUATION.md                # This file
 ```
 
 ---
 
-## Dependencies
+## Key Functions
 
-```toml
-# pyproject.toml
-dependencies = [
-    "qiskit>=1.0,<2.0",
-    "qiskit-aer>=0.13",
-    "qiskit-nature>=0.7",
-    "pyscf>=2.4",
-    "numpy>=1.24",
-    "scipy>=1.10",
-    "matplotlib>=3.7",
-]
-
-[project.optional-dependencies]
-ibm = ["qiskit-ibm-runtime>=0.20"]
-```
-
----
-
-## IBM Quantum Setup
-
-User has IBM Quantum account. To configure:
-
+### ZNE Resilience Sweep
 ```python
-from qiskit_ibm_runtime import QiskitRuntimeService
-QiskitRuntimeService.save_account(channel="ibm_quantum", token="YOUR_TOKEN")
+from h2_vqe.ibm_runtime import run_vqe_resilience_sweep
+from h2_vqe.molecular import compute_h2_integrals
+
+mol_data = compute_h2_integrals(0.74)
+results = run_vqe_resilience_sweep(
+    mol_data,
+    resilience_levels=[0, 1, 2],  # raw, M3, ZNE
+    ansatz_type="noise_aware",
+)
+# results[0] = raw, results[2] = ZNE
+```
+
+### ZNE Comparison Plot
+```python
+from h2_vqe.visualization import plot_zne_comparison
+
+fig = plot_zne_comparison(
+    bond_lengths=np.array([0.5, 0.74, 1.0, 1.5, 2.0]),
+    fci_energies=fci,
+    sim_noiseless=sim_noiseless,
+    sim_noisy=sim_noisy,
+    hw_raw=hw_raw,    # Optional
+    hw_zne=hw_zne,    # Optional
+    save_path="zne_comparison.png",
+)
 ```
 
 ---
@@ -300,41 +155,31 @@ QiskitRuntimeService.save_account(channel="ibm_quantum", token="YOUR_TOKEN")
 ```bash
 cd /Users/sakeeb/Code\ repositories/h2-vqe-dissociation
 source .venv/bin/activate
+
+# All tests
 python -m pytest tests/ -v
+
+# ZNE-specific tests
+python -m pytest tests/test_zne_*.py -v
+
+# Quick integration test
+python scripts/test_zne_scripts.py
 ```
 
 ---
 
-## Quick Commands
+## Next Steps / Future Work
 
-```bash
-# Run simulator noise experiment (quick test)
-python scripts/run_noise_experiment.py --quick
-
-# List available IBM backends
-python scripts/run_hardware_experiment.py --list-backends
-
-# Dry run hardware experiment
-python scripts/run_hardware_experiment.py --dry-run
-
-# Run on hardware (requires IBM credentials)
-python scripts/run_hardware_experiment.py --ansatz noise_aware
-```
-
----
-
-## Expected Deliverables
-
-1. **Data**: `results/zne_benchmark.json` with all energies
-2. **Figure**: Comparison plot showing ZNE effectiveness
-3. **Table**: Summary statistics (MAE, improvement ratios)
-4. **Analysis**: Does our noise model predict hardware performance?
+1. **Run actual hardware benchmark**: Execute on IBM device when queue times allow
+2. **Additional analysis**: Add statistical error bars from shot noise
+3. **More ansatze comparison**: Test hardware-efficient ansatz on hardware
+4. **Documentation**: Write up results as blog post or paper
 
 ---
 
 ## Notes
 
-- Use `noise_aware` ansatz only for hardware (2 CNOTs, most NISQ-friendly)
-- 5 bond lengths is sufficient: [0.5, 0.74, 1.0, 1.5, 2.0] Å
-- Queue times vary - 127-qubit devices often have better availability
+- Use `noise_aware` ansatz for hardware (2 CNOTs, most NISQ-friendly)
+- 5 bond lengths capture key physics: [0.5, 0.74, 1.0, 1.5, 2.0] Å
 - ZNE (resilience_level=2) requires ~3x more circuits than raw
+- 161 tests ensure code quality and prevent regressions

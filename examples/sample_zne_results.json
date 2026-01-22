@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-01-22T14:30:00",
+  "bond_lengths": [0.5, 0.74, 1.0, 1.5, 2.0],
+  "ansatz": "noise_aware",
+  "maxiter": 50,
+  "shots": 4096,
+  "fci": [-1.0550, -1.1373, -1.1018, -1.0229, -0.9541],
+  "sim_noiseless": [-1.0548, -1.1370, -1.1015, -1.0225, -0.9538],
+  "sim_noisy": [-1.0412, -1.1231, -1.0876, -1.0085, -0.9395],
+  "hw_raw": [-1.0180, -1.0950, -1.0620, -0.9850, -0.9170],
+  "hw_zne": [-1.0420, -1.1250, -1.0890, -1.0100, -0.9410],
+  "backend": "ibm_brisbane",
+  "job_ids_raw": ["sample_job_1", "sample_job_2"],
+  "job_ids_zne": ["sample_job_3", "sample_job_4"],
+  "_comment": "Sample data for demonstration and testing purposes"
+}

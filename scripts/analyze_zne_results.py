@@ -41,6 +41,43 @@ def load_results(filepath: str) -> dict:
         return json.load(f)
 
 
+def validate_results(results: dict) -> list:
+    """
+    Validate benchmark results structure.
+
+    Returns:
+        List of validation warnings (empty if all OK)
+    """
+    warnings = []
+
+    # Required keys
+    required = ["bond_lengths", "fci"]
+    for key in required:
+        if key not in results:
+            warnings.append(f"Missing required key: {key}")
+
+    # Check array lengths match
+    if "bond_lengths" in results:
+        n = len(results["bond_lengths"])
+        for key in ["fci", "sim_noiseless", "sim_noisy", "hw_raw", "hw_zne"]:
+            if key in results and len(results[key]) != n:
+                warnings.append(f"Array length mismatch: {key} has {len(results[key])} elements, expected {n}")
+
+    # Check for NaN values
+    for key in ["fci", "sim_noiseless", "sim_noisy", "hw_raw", "hw_zne"]:
+        if key in results:
+            if any(np.isnan(results[key])):
+                warnings.append(f"NaN values found in {key}")
+
+    # Warn about incomplete hardware data
+    if "hw_raw" in results and "hw_zne" not in results:
+        warnings.append("Hardware raw data present but no ZNE data - ZNE analysis will be skipped")
+    if "hw_zne" in results and "hw_raw" not in results:
+        warnings.append("Hardware ZNE data present but no raw data - comparison not possible")
+
+    return warnings
+
+
 def compute_mae(energies: np.ndarray, reference: np.ndarray) -> float:
     """Compute Mean Absolute Error in mHa."""
     return np.mean(np.abs(energies - reference)) * 1000
@@ -445,6 +482,13 @@ def main():
     # Load results
     print(f"Loading results from: {args.results_file}")
     results = load_results(args.results_file)
+
+    # Validate
+    warnings = validate_results(results)
+    if warnings:
+        print("\nValidation warnings:")
+        for w in warnings:
+            print(f"  - {w}")
 
     # Analyze
     metrics = analyze_results(results, verbose=not args.quiet)

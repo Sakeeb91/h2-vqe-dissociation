@@ -89,3 +89,4 @@ results/*.csv
 
 # Temporary test files
 test_viz*.py
+docs/SESSION_LOG.md
